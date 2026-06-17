@@ -1,0 +1,32 @@
+## .NET / WPF
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.dll
+*.exe
+*.pdb
+
+## VS Code
+.vscode/
+
+## Rider
+.idea/
+
+## VS
+.vs/
+
+## Publish
+publish/
+*.pubxml
+*.pubxml.user
+
+## Logs
+Logs/
+*.log
+
+## OS
+.DS_Store
+Thumbs.db
