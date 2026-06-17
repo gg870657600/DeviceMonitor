@@ -157,19 +157,29 @@
                     <RowDefinition/>
                 </Grid.RowDefinitions>
                 <TextBlock Text="操作日志" Style="{StaticResource GroupTitle}"/>
-                <TextBox Name="RegisterResultTextBox"
-                         Grid.Row="1"
-                         TextWrapping="Wrap" Text=""
-                         IsReadOnly="True"
-                         IsUndoEnabled="False"
-                         FontFamily="Consolas, Microsoft YaHei UI"
-                         FontSize="12"
-                         Background="#FFFAFAFA"
-                         BorderBrush="#FFE0E0E0"
-                         BorderThickness="1"
-                         Padding="8,6"
-                         VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Auto"/>
+                <ListView Name="OpLogListView"
+                          Grid.Row="1"
+                          ItemsSource="{Binding}"
+                          VirtualizingStackPanel.IsVirtualizing="True"
+                          VirtualizingStackPanel.VirtualizationMode="Recycling"
+                          VirtualizingStackPanel.ScrollUnit="Pixel"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.CanContentScroll="True"
+                          Background="#FFFAFAFA"
+                          BorderBrush="#FFE0E0E0"
+                          BorderThickness="1"
+                          Padding="0">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Text}"
+                                       FontFamily="Consolas, Microsoft YaHei UI"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Padding="8,2"/>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
             </Grid>
         </Border>
 

@@ -42,79 +42,119 @@ namespace chengkong
         public MainWindow()
         {
             InitializeComponent();
-            LogListView.ItemsSource = _logEntries;
+            OpLogListView.ItemsSource = _logEntries;
+            LogListView.ItemsSource = _resultEntries;
+            InitLogFlushTimer();
             AppendLogLeft("程序已启动，请配置参数后点击 [下发]");
         }
 
         #region UI 日志辅助方法
 
-        // 操作日志最大保留行数（超过自动从顶部截断，避免 TextBox 越长越卡）
-        private const int MaxLogLines = 2000;
+        // 操作日志最大保留行数（10 万行）
+        // ListView + VirtualizingStackPanel 可流畅支持此量级
+        private const int MaxLogLines = 100_000;
+
+        // UI 刷新节流间隔：每 100ms 批量刷新一次
+        private const int LogFlushIntervalMs = 100;
+
+        /// <summary>
+        /// 日志条目数据模型
+        /// </summary>
+        public class LogEntry
+        {
+            public string Text { get; set; } = "";
+            public DateTime Time { get; set; } = DateTime.Now;
+        }
+
+        // 全部日志条目（绑定到 ListView，UI 线程访问）— 实际见类成员
+
+        // 解析结果集合（绑定到 LogListView，右侧）
+        public class ResultEntry
+        {
+            public string Text { get; set; } = "";
+            public bool? IsOk { get; set; }
+        }
+        private readonly System.Collections.ObjectModel.ObservableCollection<ResultEntry> _resultEntries = new();
+
+        // 后台线程的待刷新缓冲（线程安全的 FIFO）
+        private readonly System.Collections.Concurrent.ConcurrentQueue<LogEntry> _pendingLogs = new();
+
+        private DispatcherTimer? _logFlushTimer;
+
+        private void InitLogFlushTimer()
+        {
+            _logFlushTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(LogFlushIntervalMs)
+            };
+            _logFlushTimer.Tick += (_, _) =>
+            {
+                if (_pendingLogs.IsEmpty) return;
+                Dispatcher.Invoke(() =>
+                {
+                    int added = 0;
+                    while (_pendingLogs.TryDequeue(out var entry) && added < 2000)
+                    {
+                        _logEntries.Add(entry);
+                        added++;
+                    }
+                    // 行数限制：从头部截断（只在确实超限时执行）
+                    int overflow = _logEntries.Count - MaxLogLines;
+                    if (overflow > 0)
+                    {
+                        for (int i = 0; i < overflow; i++)
+                            _logEntries.RemoveAt(0);
+                    }
+                    // 滚动到末尾
+                    if (_logEntries.Count > 0)
+                    {
+                        OpLogListView.ScrollIntoView(_logEntries[_logEntries.Count - 1]);
+                    }
+                });
+            };
+            _logFlushTimer.Start();
+        }
 
         private void AppendLogLeft(string text)
         {
-            Dispatcher.InvokeAsync(() =>
-            {
-                RegisterResultTextBox.AppendText(text + Environment.NewLine);
-                TrimLogLines();
-                RegisterResultTextBox.ScrollToEnd();
-            }, DispatcherPriority.Background);
+            _pendingLogs.Enqueue(new LogEntry { Text = text });
         }
 
         /// <summary>
-        /// 批量写入左侧日志：把多行文本合并为一次 Dispatcher 调度 + 一次 AppendText
-        /// 大幅减少 UI 线程排队次数，提升循环节奏
+        /// 批量写入左侧日志：把多行文本合并后入队，单次 Dispatcher 刷新
         /// </summary>
         private void AppendLogLeftBatch(IEnumerable<string> lines)
         {
             if (lines == null) return;
             // 关键：拍快照（ToList），避免闭包陷阱
-            // 如果直接传 List 引用，外部 Clear 后 lambda 枚举时已为空
             var snapshot = lines.ToList();
             Dispatcher.InvokeAsync(() =>
             {
-                var sb = new System.Text.StringBuilder();
                 foreach (string line in snapshot)
                 {
-                    sb.AppendLine(line);
+                    _logEntries.Add(new LogEntry { Text = line });
                 }
-                RegisterResultTextBox.AppendText(sb.ToString());
-                TrimLogLines();
-                RegisterResultTextBox.ScrollToEnd();
-            }, DispatcherPriority.Background);
-        }
-
-        /// <summary>
-        /// 行数超限时，从顶部截断，保留最后 MaxLogLines 行
-        /// TextBox 越长单次 AppendText 越慢（O(n)），必须限制大小
-        /// </summary>
-        private void TrimLogLines()
-        {
-            var text = RegisterResultTextBox.Text;
-            int lineCount = 0;
-            int cutPos = -1;
-            // 从后往前扫描，找到第 MaxLogLines 个换行符的位置
-            for (int i = text.Length - 1; i >= 0; i--)
-            {
-                if (text[i] == '\n') lineCount++;
-                if (lineCount > MaxLogLines)
+                // 行数限制
+                int overflow = _logEntries.Count - MaxLogLines;
+                if (overflow > 0)
                 {
-                    cutPos = i + 1;
-                    break;
+                    for (int i = 0; i < overflow; i++)
+                        _logEntries.RemoveAt(0);
                 }
-            }
-            if (cutPos > 0)
-            {
-                RegisterResultTextBox.Text = text.Substring(cutPos);
-            }
+                // 滚动到末尾
+                if (_logEntries.Count > 0)
+                {
+                    OpLogListView.ScrollIntoView(_logEntries[_logEntries.Count - 1]);
+                }
+            }, DispatcherPriority.Background);
         }
 
         private void AppendLogRight(string text, bool? isOk = null)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                var entry = new LogEntry { Text = text, IsOk = isOk };
-                _logEntries.Add(entry);
+                var entry = new ResultEntry { Text = text, IsOk = isOk };
+                _resultEntries.Add(entry);
                 LogListView.ScrollIntoView(entry);
             }, DispatcherPriority.Background);
         }
