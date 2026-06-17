@@ -163,7 +163,7 @@ namespace chengkong
         {
             Dispatcher.InvokeAsync(() =>
             {
-                _logEntries.Clear();
+                _resultEntries.Clear();
             });
         }
 
