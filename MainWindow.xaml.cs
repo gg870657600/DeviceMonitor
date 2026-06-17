@@ -57,6 +57,25 @@ namespace chengkong
             }, DispatcherPriority.Background);
         }
 
+        /// <summary>
+        /// 批量写入左侧日志：把多行文本合并为一次 Dispatcher 调度 + 一次 AppendText
+        /// 大幅减少 UI 线程排队次数，提升循环节奏
+        /// </summary>
+        private void AppendLogLeftBatch(IEnumerable<string> lines)
+        {
+            if (lines == null) return;
+            Dispatcher.InvokeAsync(() =>
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (string line in lines)
+                {
+                    sb.AppendLine(line);
+                }
+                RegisterResultTextBox.AppendText(sb.ToString());
+                RegisterResultTextBox.ScrollToEnd();
+            }, DispatcherPriority.Background);
+        }
+
         private void AppendLogRight(string text, bool? isOk = null)
         {
             Dispatcher.InvokeAsync(() =>
@@ -357,13 +376,21 @@ namespace chengkong
                 int consecutiveZeroCount = 0;
                 const int triggerStopCount = 5;
 
+                // 读取命令返回的最大等待：默认 3 秒，最长 = 间隔时间 × 2 倍
+                // 之前固定 5 秒硬等待，会让"间隔 1 秒"实际变成 6 秒
+                int readMaxWaitMs = Math.Max(3000, intervalSec * 1000 * 2);
+
                 // 主循环：发命令 → 等「间隔时间（秒）」→ 读返回 → 解析
                 while (DateTime.Now < endTime && !cancellationToken.IsCancellationRequested)
                 {
-                    AppendLogLeft($"");
-                    AppendLogLeft($"═══════ 第 {currentCount} 次执行 ═══════");
-                    AppendLogLeft($"[发送] 命令: {userCommand}");
-                    AppendLogLeft($"[等待] 等 {intervalSec} 秒后读取返回...");
+                    var loopSw = Stopwatch.StartNew();
+                    var localLog = new List<string>(32);
+                    localLog.Add("");
+                    localLog.Add($"═══════ 第 {currentCount} 次执行 ═══════");
+                    localLog.Add($"[发送] 命令: {userCommand}");
+                    localLog.Add($"[等待] 等 {intervalSec} 秒后读取返回...");
+
+                    AppendLogLeftBatch(localLog);
 
                     shell.WriteLine(userCommand);
 
@@ -374,38 +401,44 @@ namespace chengkong
                     }
                     catch (AggregateException) when (cancellationToken.IsCancellationRequested)
                     {
-                        AppendLogLeft($"[取消] 第 {currentCount} 次执行等待中收到取消信号");
+                        localLog.Clear();
+                        localLog.Add($"[取消] 第 {currentCount} 次执行等待中收到取消信号");
+                        AppendLogLeftBatch(localLog);
                         break;
                     }
 
-                    string result = ReadShellClean(shell, 5000);
+                    string result = ReadShellClean(shell, readMaxWaitMs);
 
                     // 输出原始返回内容
-                    AppendLogLeft($"──── 原始返回 (长度: {result.Length}) ────");
+                    localLog.Add($"──── 原始返回 (长度: {result.Length}) ────");
                     if (string.IsNullOrWhiteSpace(result))
                     {
-                        AppendLogLeft($"  (空)");
+                        localLog.Add("  (空)");
                     }
                     else
                     {
                         int lineNo = 1;
                         foreach (string line in result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                         {
-                            AppendLogLeft($"  [{lineNo:D2}] {line}");
+                            localLog.Add($"  [{lineNo:D2}] {line}");
                             lineNo++;
                         }
                     }
 
                     // 解析
                     var (currentValue, parseTrace) = ParseKeywordFieldDetailed(result, keyword, fieldPosition);
-                    AppendLogLeft($"──── 解析过程 ────");
+                    localLog.Add($"──── 解析过程 ────");
                     foreach (string trace in parseTrace)
                     {
-                        AppendLogLeft($"  {trace}");
+                        localLog.Add($"  {trace}");
                     }
 
-                    // 写文件日志
-                    WriteToLog(currentCount, result, currentValue, keyword, fieldPosition);
+                    // 一次性批量输出
+                    AppendLogLeftBatch(localLog);
+                    localLog.Clear();
+
+                    // 写文件日志（异步，不阻塞主循环）
+                    Task.Run(() => WriteToLog(currentCount, result, currentValue, keyword, fieldPosition));
 
                     // 判定：解析失败 或 解析值 == "0.00" 都视为异常
                     bool parseFailed = currentValue == "解析失败" || currentValue == "0.00";
@@ -422,17 +455,27 @@ namespace chengkong
                     }
 
                     string statusText = isOk ? "正常" : "异常";
-                    AppendLogLeft($"──── 判定 ────");
-                    AppendLogLeft($"  解析值: {currentValue}");
-                    AppendLogLeft($"  判定规则: 解析成功 且 解析值 != \"0.00\" 才算正常");
-                    AppendLogLeft($"  本次结果: {statusText} | 累计 OK: {_okCount} | 不OK: {_notOkCount} | 连续异常: {consecutiveZeroCount}");
+                    var judgeLog = new List<string>(8);
+                    judgeLog.Add($"──── 判定 ────");
+                    judgeLog.Add($"  解析值: {currentValue}");
+                    judgeLog.Add($"  判定规则: 解析成功 且 解析值 != \"0.00\" 才算正常");
+                    judgeLog.Add($"  本次结果: {statusText} | 累计 OK: {_okCount} | 不OK: {_notOkCount} | 连续异常: {consecutiveZeroCount}");
+
+                    loopSw.Stop();
+                    judgeLog.Add($"  本轮耗时: {loopSw.ElapsedMilliseconds}ms (含解析+日志)");
+                    AppendLogLeftBatch(judgeLog);
+
                     AppendLogRight($"【第 {currentCount} 次】{keyword} = {currentValue} → {statusText}", isOk);
                     UpdateCountDisplay();
 
                     // 连续5次异常 → 终止整个任务，但仍执行收尾 redir_off
                     if (consecutiveZeroCount >= triggerStopCount)
                     {
-                        AppendLogLeft($"[终止] ✗ 连续 {triggerStopCount} 次异常，自动终止任务！");
+                        var failLog = new List<string>(2)
+                        {
+                            $"[终止] ✗ 连续 {triggerStopCount} 次异常，自动终止任务！"
+                        };
+                        AppendLogLeftBatch(failLog);
                         AppendLogRight($"【第 {currentCount} 次】连续 {triggerStopCount} 次异常，任务终止！", false);
 
                         Dispatcher.InvokeAsync(() =>
@@ -516,16 +559,47 @@ namespace chengkong
                 shell.Read();
         }
 
-        private string ReadShellClean(ShellStream shell, int waitMs)
+        /// <summary>
+        /// 读取命令返回（轮询 + 短间隔 + 命中结束/超时退出）
+        /// 替代原来的固定 Sleep 5 秒方案：
+        ///   - 30ms 短轮询 shell.Length
+        ///   - 连续 idleThresholdMs 毫秒无新数据 → 视为返回结束
+        ///   - 总时长上限 maxWaitMs（毫秒）兜底
+        /// 这样 1 秒间隔的实际循环节奏可以接近 1.0~1.1 秒
+        /// </summary>
+        private string ReadShellClean(ShellStream shell, int maxWaitMs)
         {
-            Thread.Sleep(waitMs);
-            StringBuilder sb = new StringBuilder();
-            while (shell.Length > 0)
+            var sb = new StringBuilder();
+            var sw = Stopwatch.StartNew();
+            int idleMs = 0;
+            const int pollIntervalMs = 30;
+            const int idleThresholdMs = 300;
+
+            while (sw.ElapsedMilliseconds < maxWaitMs)
             {
-                string? line = shell.ReadLine();
-                if (string.IsNullOrEmpty(line)) continue;
-                if (line.Trim().StartsWith("bsp ") || line.Contains("root@andi")) continue;
-                sb.AppendLine(line.Trim());
+                if (shell.Length > 0)
+                {
+                    idleMs = 0;
+                    try
+                    {
+                        string? line = shell.ReadLine();
+                        if (string.IsNullOrEmpty(line)) continue;
+                        string trimmed = line.Trim();
+                        if (trimmed.StartsWith("bsp ") || trimmed.Contains("root@andi")) continue;
+                        sb.AppendLine(trimmed);
+                    }
+                    catch
+                    {
+                        // 读取过程中连接异常时跳出，由外层 try/catch 处理
+                        break;
+                    }
+                }
+                else
+                {
+                    idleMs += pollIntervalMs;
+                    if (idleMs >= idleThresholdMs && sb.Length > 0) break;
+                    Thread.Sleep(pollIntervalMs);
+                }
             }
             return sb.ToString().Trim();
         }
