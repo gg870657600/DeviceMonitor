@@ -405,9 +405,38 @@ namespace chengkong
                     }
                     catch (AggregateException) when (cancellationToken.IsCancellationRequested)
                     {
+                        // 取消发生时，shell.WriteLine 可能已经发出，设备的返回数据
+                        // 可能已经在 shell 缓冲区里。把已有数据读出来并展示，
+                        // 避免界面与 txt 日志出现"界面少、txt 多"的不一致
+                        string cancelResult = ReadShellClean(shell, readMaxWaitMs);
+
                         localLog.Add($"[取消] 第 {currentCount} 次执行等待中收到取消信号");
+                        localLog.Add($"──── 原始返回 (长度: {cancelResult.Length}) ────");
+                        if (string.IsNullOrWhiteSpace(cancelResult))
+                        {
+                            localLog.Add("  (空)");
+                        }
+                        else
+                        {
+                            int cancelLineNo = 1;
+                            foreach (string line in cancelResult.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                localLog.Add($"  [{cancelLineNo:D2}] {line}");
+                                cancelLineNo++;
+                            }
+                        }
+                        var (cancelValue, cancelTrace) = ParseKeywordFieldDetailed(cancelResult, keyword, fieldPosition);
+                        localLog.Add($"──── 解析过程 ────");
+                        foreach (string trace in cancelTrace)
+                        {
+                            localLog.Add($"  {trace}");
+                        }
                         AppendLogLeftBatch(localLog);
                         localLog.Clear();
+
+                        // 异步写文件日志（与正常路径一致）
+                        Task.Run(() => WriteToLog(currentCount, cancelResult, cancelValue, keyword, fieldPosition));
+
                         // 右侧补一条"已取消"记录，与正常/异常条目保持一一对应
                         AppendLogRight($"【第 {currentCount} 次】{keyword} = -- → 已取消", false);
                         UpdateCountDisplay();
