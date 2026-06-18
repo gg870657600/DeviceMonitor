@@ -1,0 +1,68 @@
+<Window x:Class="DeviceMonitor.ChartWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+        Title="解析值趋势图" Height="560" Width="900"
+        WindowStartupLocation="CenterOwner"
+        Background="#FFF5F5F5"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        FontSize="13">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 图表 -->
+        <lvc:CartesianChart Name="ChartControl"
+                            ZoomMode="Both"
+                            TooltipPosition="Top"/>
+
+        <!-- 底部统计面板 -->
+        <Border Grid.Row="1" Margin="0,10,0,0" Padding="12,10"
+                Background="White" BorderBrush="#FFE8E8E8"
+                BorderThickness="1" CornerRadius="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 左侧统计 -->
+                <WrapPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="当前:" FontWeight="SemiBold" Foreground="#FF333333" Margin="0,0,4,0"/>
+                    <TextBlock Name="TbCurrent" Text="-" Foreground="#FF0078D4" FontWeight="Bold" Margin="0,0,20,0" MinWidth="60"/>
+
+                    <TextBlock Text="最大值:" FontWeight="SemiBold" Foreground="#FF333333" Margin="0,0,4,0"/>
+                    <TextBlock Name="TbMax" Text="-" Foreground="#FFD32F2F" FontWeight="Bold" Margin="0,0,20,0" MinWidth="100"/>
+
+                    <TextBlock Text="最小值:" FontWeight="SemiBold" Foreground="#FF333333" Margin="0,0,4,0"/>
+                    <TextBlock Name="TbMin" Text="-" Foreground="#FF388E3C" FontWeight="Bold" Margin="0,0,20,0" MinWidth="100"/>
+
+                    <TextBlock Text="均值:" FontWeight="SemiBold" Foreground="#FF333333" Margin="0,0,4,0"/>
+                    <TextBlock Name="TbAvg" Text="-" Foreground="#FF555555" FontWeight="Bold" Margin="0,0,20,0" MinWidth="60"/>
+
+                    <TextBlock Text="标准差:" FontWeight="SemiBold" Foreground="#FF333333" Margin="0,0,4,0"/>
+                    <TextBlock Name="TbStddev" Text="-" Foreground="#FF555555" FontWeight="Bold" Margin="0,0,20,0" MinWidth="60"/>
+
+                    <TextBlock Text="点数:" FontWeight="SemiBold" Foreground="#FF333333" Margin="0,0,4,0"/>
+                    <TextBlock Name="TbCount" Text="0" Foreground="#FF555555" FontWeight="Bold" MinWidth="50"/>
+                </WrapPanel>
+
+                <!-- 右侧阈值 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="阈值线:" FontWeight="SemiBold" Foreground="#FF333333" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Name="ThresholdBox" Text="" Width="80" Height="28" VerticalContentAlignment="Center"
+                             Padding="6,0" FontSize="12" BorderBrush="#FFCCCCCC" BorderThickness="1"/>
+                    <Button Name="ApplyThresholdBtn" Content="应用" Margin="6,0,0,0" Height="28" Padding="12,0"
+                            Background="#FF0078D4" Foreground="White" BorderThickness="0" FontSize="12"
+                            Click="ApplyThreshold_Click"/>
+                    <Button Name="ClearThresholdBtn" Content="清除" Margin="6,0,0,0" Height="28" Padding="12,0"
+                            Background="#FFF5F5F5" Foreground="#FF666666" BorderBrush="#FFCCCCCC" BorderThickness="1"
+                            FontSize="12" Click="ClearThreshold_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

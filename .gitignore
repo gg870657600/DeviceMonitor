@@ -2,6 +2,7 @@
 bin/
 obj/
 *.user
+*.csproj.user        # VS 调试/启动设置缓存
 *.suo
 *.userosscache
 *.sln.docstates

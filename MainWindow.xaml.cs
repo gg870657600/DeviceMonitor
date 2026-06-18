@@ -16,8 +16,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using LiveChartsCore.Defaults;
 
-namespace chengkong
+namespace DeviceMonitor
 {
     // ══════════════════════════════════════════════════════════════
     // 公共数据模型
@@ -64,6 +65,8 @@ namespace chengkong
         private readonly ObservableCollection<ResultEntry> _serialResultEntries = new();
         private readonly ConcurrentQueue<LogEntry> _serialPendingLogs = new();
         private DispatcherTimer? _serialLogFlushTimer;
+        private readonly ObservableCollection<DateTimePoint> _serialChartData = new();
+        private ChartWindow? _serialChartWindow;
 
         // ══════════════════════════════════════════════════════════
         // Telnet Tab 字段
@@ -80,6 +83,8 @@ namespace chengkong
         private readonly ObservableCollection<ResultEntry> _telnetResultEntries = new();
         private readonly ConcurrentQueue<LogEntry> _telnetPendingLogs = new();
         private DispatcherTimer? _telnetLogFlushTimer;
+        private readonly ObservableCollection<DateTimePoint> _telnetChartData = new();
+        private ChartWindow? _telnetChartWindow;
 
         // ══════════════════════════════════════════════════════════
         // 构造函数
@@ -321,12 +326,12 @@ namespace chengkong
                     }
                 });
 
-                // 20 秒总超时保护
-                var completed = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(20)));
+                // 5 秒总超时保护
+                var completed = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(5)));
 
                 if (completed != connectTask)
                 {
-                    AppendLog(isSerial, "[连接] ✗ 超时（20秒），可能网络不通或 IP/端口错误");
+                    AppendLog(isSerial, "[连接] ✗ 超时（5秒），可能网络不通或 IP/端口错误");
                     SetStatus(isSerial, "● 未连接", "#FFD32F2F");
                     return false;
                 }
@@ -680,6 +685,65 @@ namespace chengkong
         }
 
         // ══════════════════════════════════════════════════════════
+        // 图表相关
+        // ══════════════════════════════════════════════════════════
+        private static double? ParseChartValue(string parsed)
+        {
+            if (double.TryParse(parsed, out var v))
+                return v;
+            return parsed.ToLowerInvariant() switch
+            {
+                "enable" or "on" => 1,
+                "disable" or "off" => 0,
+                _ => null,
+            };
+        }
+
+        private void AddChartPoint(bool isSerial, DateTime time, string parsed)
+        {
+            var value = ParseChartValue(parsed);
+            if (value == null) return;
+            var data = isSerial ? _serialChartData : _telnetChartData;
+            Dispatcher.InvokeAsync(() =>
+            {
+                data.Add(new DateTimePoint(time, value.Value));
+                // 限制最大点数，防止内存膨胀
+                if (data.Count > 500_000)
+                    data.RemoveAt(0);
+            }, DispatcherPriority.Background);
+        }
+
+        private void OpenChart(bool isSerial)
+        {
+            if (isSerial)
+            {
+                if (_serialChartWindow != null && _serialChartWindow.IsVisible)
+                {
+                    _serialChartWindow.Activate();
+                    return;
+                }
+                var kw = SerialKeyword.Text.Trim();
+                _serialChartWindow = new ChartWindow("串口 - " + kw, kw, _serialChartData);
+                _serialChartWindow.Owner = this;
+                _serialChartWindow.Closed += (_, _) => _serialChartWindow = null;
+                _serialChartWindow.Show();
+            }
+            else
+            {
+                if (_telnetChartWindow != null && _telnetChartWindow.IsVisible)
+                {
+                    _telnetChartWindow.Activate();
+                    return;
+                }
+                var kw = TelnetKeyword.Text.Trim();
+                _telnetChartWindow = new ChartWindow("Telnet - " + kw, kw, _telnetChartData);
+                _telnetChartWindow.Owner = this;
+                _telnetChartWindow.Closed += (_, _) => _telnetChartWindow = null;
+                _telnetChartWindow.Show();
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════
         // 公共：单次循环执行
         // ══════════════════════════════════════════════════════════
         private void ExecuteOnce(bool isSerial, ShellStream shell,
@@ -746,6 +810,9 @@ namespace chengkong
 
             resultFn($"【第 {currentCount} 次】{keyword} = {parsed} → {statusText}", isOk);
             countFn();
+
+            // 添加图表数据点
+            AddChartPoint(isSerial, DateTime.Now, parsed);
         }
 
         // ══════════════════════════════════════════════════════════
@@ -791,6 +858,7 @@ namespace chengkong
             _serialOkCount = 0;
             _serialNotOkCount = 0;
             ClearResult(isSerial: true);
+            _serialChartData.Clear();
 
             File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SensorPosLog.txt"), "");
 
@@ -915,6 +983,7 @@ namespace chengkong
             _telnetOkCount = 0;
             _telnetNotOkCount = 0;
             ClearResult(isSerial: false);
+            _telnetChartData.Clear();
 
             File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TelnetLog.txt"), "");
 
@@ -994,6 +1063,19 @@ namespace chengkong
                     SetButtons(isSerial: false, isRunning: false, isConnected: false);
                 }
             });
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // 图表按钮
+        // ══════════════════════════════════════════════════════════
+        private void SerialChart_Click(object sender, RoutedEventArgs e)
+        {
+            OpenChart(isSerial: true);
+        }
+
+        private void TelnetChart_Click(object sender, RoutedEventArgs e)
+        {
+            OpenChart(isSerial: false);
         }
 
         // ══════════════════════════════════════════════════════════
