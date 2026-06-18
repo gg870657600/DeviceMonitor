@@ -149,7 +149,7 @@
                             <TextBlock Text="SSH 连接" Style="{StaticResource GroupTitle}"/>
                             <WrapPanel>
                                 <TextBlock Text="IP" Style="{StaticResource LabelText}"/>
-                                <TextBox Name="SerialIp" Text="10.10.10.3" Width="140" Style="{StaticResource ModernTextBox}"/>
+                                <TextBox Name="SerialIp" Text="197.6.7.23" Width="140" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="端口" Style="{StaticResource LabelText}" Margin="20,0,6,0"/>
                                 <TextBox Name="SerialPort" Text="22" Width="50" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="用户" Style="{StaticResource LabelText}" Margin="20,0,6,0"/>
@@ -297,7 +297,7 @@
                             <TextBlock Text="SSH 连接（登录后执行 telnet 0 2323）" Style="{StaticResource GroupTitle}"/>
                             <WrapPanel>
                                 <TextBlock Text="IP" Style="{StaticResource LabelText}"/>
-                                <TextBox Name="TelnetIp" Text="10.10.10.3" Width="140" Style="{StaticResource ModernTextBox}"/>
+                                <TextBox Name="TelnetIp" Text="197.6.7.23" Width="140" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="端口" Style="{StaticResource LabelText}" Margin="20,0,6,0"/>
                                 <TextBox Name="TelnetPort" Text="22" Width="50" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="用户" Style="{StaticResource LabelText}" Margin="20,0,6,0"/>
