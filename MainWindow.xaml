@@ -6,96 +6,127 @@
         xmlns:local="clr-namespace:chengkong"
         mc:Ignorable="d"
         Title="设备 SSH 工具（串口 + Telnet）" Height="620" Width="1080"
-        Background="#FFF5F5F7"
+        Background="#FFF0F2F5"
         FontFamily="Microsoft YaHei UI, Segoe UI"
         Closing="MainWindow_Closing"
         FontSize="13">
 
     <Window.Resources>
+        <!-- 主色调 -->
+        <Color x:Key="PrimaryColor">#FF0078D4</Color>
+        <Color x:Key="PrimaryHover">#FF106EBE</Color>
+        <Color x:Key="PrimaryPressed">#FF005A9E</Color>
+        <Color x:Key="SuccessColor">#FF1B7D3A</Color>
+        <Color x:Key="DangerColor">#FFD32F2F</Color>
+        <Color x:Key="WarningColor">#FFFF8F00</Color>
+        <Color x:Key="NeutralText">#FF333333</Color>
+        <Color x:Key="MutedText">#FF888888</Color>
+        <Color x:Key="BorderColor">#FFDDDDDD</Color>
+        <Color x:Key="CardBackground">White</Color>
+        <Color x:Key="PageBackground">#FFF0F2F5</Color>
+
+        <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource PrimaryHover}"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+        <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource NeutralText}"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedText}"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="{StaticResource CardBackground}"/>
+
+        <!-- 窗口阴影 -->
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="8" ShadowDepth="2" Opacity="0.1" Direction="270" Color="#FF000000"/>
+
         <!-- 文本框统一样式 -->
         <Style x:Key="ModernTextBox" TargetType="TextBox">
-            <Setter Property="Height" Value="24"/>
+            <Setter Property="Height" Value="30"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="6,0"/>
-            <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralBrush}"/>
             <Style.Triggers>
                 <Trigger Property="IsFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="#FF0078D4"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                     <Setter Property="BorderThickness" Value="1.5"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#FF999999"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- 密码框统一样式 -->
         <Style x:Key="ModernPasswordBox" TargetType="PasswordBox">
-            <Setter Property="Height" Value="24"/>
+            <Setter Property="Height" Value="30"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="6,0"/>
-            <Setter Property="BorderBrush" Value="#FFCCCCCC"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Background" Value="White"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                    <Setter Property="BorderThickness" Value="1.5"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- 标签统一样式 -->
         <Style x:Key="LabelText" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="#FF333333"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Foreground" Value="{StaticResource NeutralBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
 
-        <!-- 分组框样式 -->
+        <!-- 卡片面板 -->
         <Style x:Key="GroupPanel" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#FFE0E0E0"/>
+            <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="#FFE8E8E8"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="Margin" Value="6,4"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="6,5"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
         </Style>
 
         <!-- 主按钮 -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Height" Value="28"/>
-            <Setter Property="Width" Value="80"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Padding" Value="16,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="#FF0078D4"/>
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="3"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FF106EBE"/>
+                    <Setter Property="Background" Value="{StaticResource PrimaryHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="#FF005A9E"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="#FFB0B0B0"/>
+                    <Setter Property="Foreground" Value="#FFE0E0E0"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <!-- 次要按钮（断开） -->
+        <!-- 次要按钮 -->
         <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="#FF707070"/>
-            <Setter Property="Width" Value="60"/>
+            <Setter Property="Background" Value="#FF6B7280"/>
+            <Setter Property="MinWidth" Value="60"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FF505050"/>
+                    <Setter Property="Background" Value="#FF4B5563"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Background" Value="#FFB0B0B0"/>
@@ -106,26 +137,44 @@
         <!-- 卡片标题 -->
         <Style x:Key="GroupTitle" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#FF666666"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
-        <!-- 字段位置下拉框样式 -->
+        <!-- 字段位置下拉框 -->
         <Style x:Key="FieldPositionCombo" TargetType="ComboBox">
-            <Setter Property="Width" Value="50"/>
-            <Setter Property="Height" Value="24"/>
+            <Setter Property="Width" Value="56"/>
+            <Setter Property="Height" Value="30"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        </Style>
+
+        <!-- 连接状态指示标签 -->
+        <Style x:Key="StatusBadge" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+            <Setter Property="Padding" Value="8,3,8,4"/>
         </Style>
     </Window.Resources>
 
-    <Grid Margin="8">
+    <Grid Margin="10">
         <TabControl Name="MainTabControl" Background="Transparent" BorderThickness="0">
             <TabControl.Resources>
                 <Style TargetType="TabItem">
                     <Setter Property="FontSize" Value="13"/>
-                    <Setter Property="Padding" Value="14,6"/>
+                    <Setter Property="Padding" Value="18,8"/>
                     <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                        </Trigger>
+                    </Style.Triggers>
                 </Style>
             </TabControl.Resources>
 
@@ -158,7 +207,7 @@
                                 <PasswordBox Name="SerialPwd" Password="andisat" Width="120" Style="{StaticResource ModernPasswordBox}"/>
                                 <Button Name="SerialConnectBtn" Content="连接" Margin="20,0,0,0" Click="SerialConnect_Click" Style="{StaticResource PrimaryButton}"/>
                                 <Button Name="SerialDisconnectBtn" Content="断开" Margin="6,0,0,0" Click="SerialDisconnect_Click" Style="{StaticResource SecondaryButton}" IsEnabled="False"/>
-                                <TextBlock Name="SerialStatusText" Text="● 未连接" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="#FFD32F2F" FontWeight="SemiBold"/>
+                                <TextBlock Name="SerialStatusText" Style="{StaticResource StatusBadge}" Text="● 未连接" Foreground="#FFD32F2F"/>
                             </WrapPanel>
                         </StackPanel>
                     </Border>
@@ -186,10 +235,10 @@
                                 <TextBlock Text="串口命令" Style="{StaticResource LabelText}"/>
                                 <TextBox Name="SerialSshCommand" Text="bsp cmd st sensor_pos" Width="280" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="关键字" Style="{StaticResource LabelText}" Margin="20,0,6,0"
-                                           ToolTip="在命令返回结果中匹配一行作为目标行。"/>
+                                           ToolTip="匹配命令返回结果中的目标行（不区分大小写）。&#x0a;串口示例：命令返回 &quot;current pos: 12345&quot;，关键字填 &quot;current pos&quot;。"/>
                                 <TextBox Name="SerialKeyword" Text="current pos" Width="100" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="取第几段" Style="{StaticResource LabelText}" Margin="20,0,6,0"
-                                           ToolTip="把关键字所在行按空格/Tab 分割成多段，取第 N 段作为解析值（从 1 开始）。"/>
+                                           ToolTip="把关键字所在行按空格/Tab 分割成多段，取第 N 段作为解析值（从 1 开始）。&#x0a;示例：&quot;current pos: 12345&quot;，第3段 → 12345。"/>
                                 <ComboBox Name="SerialFieldPosition" SelectedIndex="2" Style="{StaticResource FieldPositionCombo}">
                                     <ComboBoxItem>1</ComboBoxItem>
                                     <ComboBoxItem>2</ComboBoxItem>
@@ -203,7 +252,6 @@
                                     <ComboBoxItem>10</ComboBoxItem>
                                 </ComboBox>
                                 <Button Name="SerialSendButton" Content="下发" Margin="30,0,0,0" Click="SerialSend_Click" Style="{StaticResource PrimaryButton}"/>
-                                <Button Name="SerialStopButton" Content="停止" Margin="6,0,0,0" Click="SerialStop_Click" Style="{StaticResource SecondaryButton}" IsEnabled="False"/>
                             </WrapPanel>
                         </StackPanel>
                     </Border>
@@ -226,7 +274,9 @@
                                       ScrollViewer.CanContentScroll="True"
                                       Background="#FFFAFAFA"
                                       BorderBrush="#FFE0E0E0"
-                                      BorderThickness="1">
+                                      BorderThickness="1"
+                                      SelectionMode="Extended"
+                                      KeyDown="LogListView_KeyDown">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Text}" FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" TextWrapping="Wrap" Padding="8,2"/>
@@ -245,7 +295,7 @@
                             </Grid.RowDefinitions>
                             <TextBlock Text="解析结果" Style="{StaticResource GroupTitle}"/>
                             <TextBlock Name="SerialCountTextBlock" Grid.Row="1" Margin="0,0,0,6"
-                                       Padding="10,6" Background="#FFEEEEEE" FontWeight="SemiBold" Foreground="#FF333333" Text="计数"/>
+                                       Padding="12,6" Background="#FFF5F5F5" FontWeight="SemiBold" Foreground="#FF333333" Text="计数"/>
                             <ListView Name="SerialResultListView" Grid.Row="2"
                                       Background="White" BorderBrush="#FFE0E0E0" BorderThickness="1"
                                       VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"
@@ -306,7 +356,7 @@
                                 <PasswordBox Name="TelnetPwd" Password="andisat" Width="120" Style="{StaticResource ModernPasswordBox}"/>
                                 <Button Name="TelnetConnectBtn" Content="连接" Margin="20,0,0,0" Click="TelnetConnect_Click" Style="{StaticResource PrimaryButton}"/>
                                 <Button Name="TelnetDisconnectBtn" Content="断开" Margin="6,0,0,0" Click="TelnetDisconnect_Click" Style="{StaticResource SecondaryButton}" IsEnabled="False"/>
-                                <TextBlock Name="TelnetStatusText" Text="● 未连接" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="#FFD32F2F" FontWeight="SemiBold"/>
+                                <TextBlock Name="TelnetStatusText" Style="{StaticResource StatusBadge}" Text="● 未连接" Foreground="#FFD32F2F"/>
                             </WrapPanel>
                         </StackPanel>
                     </Border>
@@ -334,11 +384,18 @@
                                 <TextBlock Text="Telnet命令" Style="{StaticResource LabelText}"/>
                                 <TextBox Name="TelnetSshCommand" Text="get-if-rx-curesn0:@bid=3&amp;pid=1&amp;chid=1" Width="280" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="关键字" Style="{StaticResource LabelText}" Margin="20,0,6,0"
-                                           ToolTip="在命令返回结果中匹配一行作为目标行。"/>
+                                           ToolTip="匹配返回结果的表头列名（不区分大小写），自动取该列下数据。&#x0a;示例：表头 &quot;BID PID CHID ESN0 EBN0&quot;，关键字填 &quot;EBN0&quot; 提取该列数值。"/>
                                 <TextBox Name="TelnetKeyword" Text="EBN0" Width="100" Style="{StaticResource ModernTextBox}"/>
+                                <TextBlock Text="BID过滤" Style="{StaticResource LabelText}" Margin="20,0,6,0"
+                                           ToolTip="当返回结果包含多行数据时，筛选指定 BID 的行。&#x0a;示例：BID=3 的行提取 disable，BID=4 的行提取 enable。"/>
+                                <ComboBox Name="TelnetBidFilter" SelectedIndex="0" Width="70" Style="{StaticResource FieldPositionCombo}">
+                                     <ComboBoxItem IsSelected="True">3</ComboBoxItem>
+                                     <ComboBoxItem>4</ComboBoxItem>
+                                 </ComboBox>
                                 <TextBlock Text="取第几段" Style="{StaticResource LabelText}" Margin="20,0,6,0"
-                                           ToolTip="把关键字所在行按空格/Tab 分割成多段，取第 N 段作为解析值（从 1 开始）。"/>
-                                <ComboBox Name="TelnetFieldPosition" SelectedIndex="5" Style="{StaticResource FieldPositionCombo}">
+                                           ToolTip="把关键字所在行按空格/Tab 分割成多段，取第 N 段作为解析值（从 1 开始）。"
+                                           Visibility="Collapsed"/>
+                                <ComboBox Name="TelnetFieldPosition" SelectedIndex="5" Style="{StaticResource FieldPositionCombo}" Visibility="Collapsed">
                                     <ComboBoxItem>1</ComboBoxItem>
                                     <ComboBoxItem>2</ComboBoxItem>
                                     <ComboBoxItem>3</ComboBoxItem>
@@ -351,7 +408,6 @@
                                     <ComboBoxItem>10</ComboBoxItem>
                                 </ComboBox>
                                 <Button Name="TelnetSendButton" Content="下发" Margin="30,0,0,0" Click="TelnetSend_Click" Style="{StaticResource PrimaryButton}"/>
-                                <Button Name="TelnetStopButton" Content="停止" Margin="6,0,0,0" Click="TelnetStop_Click" Style="{StaticResource SecondaryButton}" IsEnabled="False"/>
                             </WrapPanel>
                         </StackPanel>
                     </Border>
@@ -374,7 +430,9 @@
                                       ScrollViewer.CanContentScroll="True"
                                       Background="#FFFAFAFA"
                                       BorderBrush="#FFE0E0E0"
-                                      BorderThickness="1">
+                                      BorderThickness="1"
+                                      SelectionMode="Extended"
+                                      KeyDown="LogListView_KeyDown">
                                 <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Text}" FontFamily="Consolas, Microsoft YaHei UI" FontSize="12" TextWrapping="Wrap" Padding="8,2"/>
@@ -393,7 +451,7 @@
                             </Grid.RowDefinitions>
                             <TextBlock Text="解析结果" Style="{StaticResource GroupTitle}"/>
                             <TextBlock Name="TelnetCountTextBlock" Grid.Row="1" Margin="0,0,0,6"
-                                       Padding="10,6" Background="#FFEEEEEE" FontWeight="SemiBold" Foreground="#FF333333" Text="计数"/>
+                                       Padding="12,6" Background="#FFF5F5F5" FontWeight="SemiBold" Foreground="#FF333333" Text="计数"/>
                             <ListView Name="TelnetResultListView" Grid.Row="2"
                                       Background="White" BorderBrush="#FFE0E0E0" BorderThickness="1"
                                       VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"

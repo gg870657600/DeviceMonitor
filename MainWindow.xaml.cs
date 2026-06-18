@@ -8,9 +8,12 @@ using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -39,6 +42,12 @@ namespace chengkong
         private const int MaxLogLines = 100_000;
         private const int LogFlushIntervalMs = 100;
         private const int TriggerStopCount = 5;
+
+        // Telnet 登录提示符：可选时间戳 [yyyy-MM-dd HH:mm:ss] + [root@主机名] #
+        // 例：[2026-06-18 14:19:20] [root@NE_name] #   或   [root@NE_name] #
+        private static readonly Regex TelnetPromptRegex =
+            new Regex(@"(?:\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] )?\[root@[\w_]+\] #",
+                RegexOptions.Compiled);
 
         // ══════════════════════════════════════════════════════════
         // 串口 Tab 字段
@@ -126,6 +135,25 @@ namespace chengkong
         }
 
         // ══════════════════════════════════════════════════════════
+        // 公共：日志复制（Ctrl+C 选中多行）
+        // ══════════════════════════════════════════════════════════
+        private void LogListView_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.C && Keyboard.Modifiers == ModifierKeys.Control
+                && sender is ListView lv && lv.SelectedItems.Count > 0)
+            {
+                var sb = new StringBuilder();
+                foreach (var item in lv.SelectedItems)
+                {
+                    if (item is LogEntry entry)
+                        sb.AppendLine(entry.Text);
+                }
+                Clipboard.SetText(sb.ToString().TrimEnd());
+                e.Handled = true;
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════
         // 公共：日志写入
         // ══════════════════════════════════════════════════════════
         private void AppendLog(bool isSerial, string text)
@@ -202,7 +230,6 @@ namespace chengkong
                 {
                     SerialSendButton.Content = isRunning ? "停止" : "下发";
                     SerialSendButton.IsEnabled = isConnected;
-                    SerialStopButton.IsEnabled = isRunning;
                     SerialConnectBtn.IsEnabled = !isConnected;
                     SerialDisconnectBtn.IsEnabled = isConnected;
                 }
@@ -210,7 +237,6 @@ namespace chengkong
                 {
                     TelnetSendButton.Content = isRunning ? "停止" : "下发";
                     TelnetSendButton.IsEnabled = isConnected;
-                    TelnetStopButton.IsEnabled = isRunning;
                     TelnetConnectBtn.IsEnabled = !isConnected;
                     TelnetDisconnectBtn.IsEnabled = isConnected;
                 }
@@ -260,55 +286,42 @@ namespace chengkong
 
             try
             {
-                // 整个 SSH 连接 + Shell 创建 + 初始读取全部在后台线程执行
                 var connectTask = Task.Run(() =>
                 {
                     SshClient? c = null;
                     ShellStream? s = null;
                     try
                     {
-                        // 与原版一致：ConnectionInfo(string host, string username, ...)，默认 port=22
                         var auth = new PasswordAuthenticationMethod(user, pwd);
-                        var connInfo = new ConnectionInfo(ip, user, auth);
-                        
-                        // 诊断：输出当前 HostKeyAlgorithms 列表
-                        var algoNames = string.Join(", ", connInfo.HostKeyAlgorithms.Keys);
-                        AppendLogDirect(isSerial, $"[诊断] HostKeyAlgorithms: {algoNames}");
-                        
-                        // 确保 ssh-rsa 在其中（老设备 OpenSSH 6.7 仅支持这个）
-                        connInfo.HostKeyAlgorithms["ssh-rsa"] = data => 
+                        var connInfo = new ConnectionInfo(ip, port, user, auth);
+
+                        // 兼容老设备（OpenSSH 6.7）仅支持 ssh-rsa
+                        connInfo.HostKeyAlgorithms["ssh-rsa"] = data =>
                             new Renci.SshNet.Security.KeyHostAlgorithm("ssh-rsa",
                                 new Renci.SshNet.Security.RsaKey(
                                     new Renci.SshNet.Security.SshKeyData(data)));
-                        
-                        c = new SshClient(connInfo);
-                        c.HostKeyReceived += (_, e) => AppendLogDirect(isSerial, $"[诊断] HostKeyReceived: {e.HostKeyName}, CanTrust={e.CanTrust}");
-                        
-                        AppendLogDirect(isSerial, "[诊断] 开始 c.Connect()...");
-                        c.Connect();
-                        AppendLogDirect(isSerial, "[诊断] c.Connect() 完成!");
 
-                        AppendLogDirect(isSerial, "[诊断] 开始 CreateShellStream...");
+                        c = new SshClient(connInfo);
+                        c.Connect();
+
                         s = c.CreateShellStream("xterm", 80, 24, 800, 600, 2048);
-                        AppendLogDirect(isSerial, "[诊断] CreateShellStream 完成!");
-                        
-                        Thread.Sleep(300);
-                        ReadShellClean(s, 1000);
+
+                        // 关闭 shell 空闲超时
+                        try { s.WriteLine("export TMOUT=0"); } catch { }
+                        try { s.WriteLine("unset TMOUT"); } catch { }
 
                         client = c;
                         shell = s;
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        AppendLogDirect(isSerial, $"[诊断] 异常: {ex.GetType().Name}: {ex.Message}");
-                        // 异常时清理已分配的资源，防止泄漏
                         try { s?.Dispose(); } catch { }
                         try { c?.Dispose(); } catch { }
                         throw;
                     }
                 });
 
-                // 20 秒总超时保护（覆盖 TCP 握手 + SSH 协议 + CreateShellStream 信道协商）
+                // 20 秒总超时保护
                 var completed = await Task.WhenAny(connectTask, Task.Delay(TimeSpan.FromSeconds(20)));
 
                 if (completed != connectTask)
@@ -318,7 +331,6 @@ namespace chengkong
                     return false;
                 }
 
-                // 等待 connectTask 中的异常抛出
                 await connectTask;
 
                 if (client == null || !client.IsConnected || shell == null)
@@ -349,16 +361,12 @@ namespace chengkong
             }
             catch (Exception ex)
             {
-                // 清理泄漏的资源
                 try { shell?.Dispose(); } catch { }
                 try { client?.Dispose(); } catch { }
 
-                // 输出完整异常信息（类型 + 消息 + 内部异常 + 堆栈）
                 AppendLog(isSerial, $"[连接] ✗ 异常: {ex.GetType().Name}: {ex.Message}");
                 if (ex.InnerException != null)
                     AppendLog(isSerial, $"  └─ 内部异常: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
-                foreach (var line in ex.ToString().Split('\n'))
-                    AppendLog(isSerial, $"  {line.TrimEnd('\r')}");
 
                 SetStatus(isSerial, "● 未连接", "#FFD32F2F");
                 return false;
@@ -415,32 +423,37 @@ namespace chengkong
         {
             var sb = new StringBuilder();
             var sw = Stopwatch.StartNew();
-            int idleMs = 0;
-            const int pollIntervalMs = 30;
-            const int idleThresholdMs = 300;
+            bool hasData = false;
+            int idleSinceLastData = 0;
+            const int pollMs = 30;
+            const int idleThresholdMs = 200;
 
             while (sw.ElapsedMilliseconds < maxWaitMs)
             {
                 if (shell.Length > 0)
                 {
-                    idleMs = 0;
                     try
                     {
-                        string? line = shell.ReadLine();
-                        if (string.IsNullOrEmpty(line)) continue;
-                        string trimmed = line.Trim();
-                        // 过滤 bsp 命令回显和 shell 提示符
-                        if (trimmed.StartsWith("bsp ") || trimmed.Contains("root@andi")) continue;
-                        sb.AppendLine(trimmed);
+                        // Read() 非阻塞，有数据就读
+                        string? data = shell.Read();
+                        if (!string.IsNullOrEmpty(data))
+                        {
+                            sb.Append(data);
+                            hasData = true;
+                            idleSinceLastData = 0;
+                            continue;
+                        }
                     }
                     catch { break; }
                 }
-                else
+
+                // 没数据：如果有 idleThresholdMs 没新数据且已有内容，退出
+                if (hasData)
                 {
-                    idleMs += pollIntervalMs;
-                    if (idleMs >= idleThresholdMs && sb.Length > 0) break;
-                    Thread.Sleep(pollIntervalMs);
+                    idleSinceLastData += pollMs;
+                    if (idleSinceLastData >= idleThresholdMs) break;
                 }
+                Thread.Sleep(pollMs);
             }
             return sb.ToString().Trim();
         }
@@ -448,7 +461,7 @@ namespace chengkong
         // ══════════════════════════════════════════════════════════
         // 公共：解析结果
         // ══════════════════════════════════════════════════════════
-        private (string value, List<string> trace) ParseResult(string response, string keyword, int fieldPosition)
+        private (string value, List<string> trace) ParseResult(string response, string keyword, int fieldPosition, bool isSerial, string bidFilter)
         {
             var trace = new List<string>();
             if (string.IsNullOrWhiteSpace(response))
@@ -460,12 +473,19 @@ namespace chengkong
             var lines = response.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             trace.Add($"共 {lines.Length} 行");
 
+            return isSerial
+                ? ParseSerialMode(lines, keyword, fieldPosition, trace)
+                : ParseColumnMode(lines, keyword, fieldPosition, trace, bidFilter);
+        }
+
+        private (string value, List<string> trace) ParseSerialMode(string[] lines, string keyword, int fieldPosition, List<string> trace)
+        {
             int matchIndex = 0;
             foreach (string line in lines)
             {
                 string trim = line.Trim();
                 matchIndex++;
-                if (trim.Contains(keyword))
+                if (trim.Contains(keyword, StringComparison.OrdinalIgnoreCase))
                 {
                     trace.Add($"  ✓ 第 {matchIndex} 行匹配关键字 \"{keyword}\"");
                     trace.Add($"    内容: {trim}");
@@ -485,6 +505,85 @@ namespace chengkong
                 }
             }
             trace.Add($"  ✗ 未找到关键字 \"{keyword}\"");
+            return ("解析失败", trace);
+        }
+
+        private (string value, List<string> trace) ParseColumnMode(string[] lines, string keyword, int fieldPosition, List<string> trace, string bidFilter)
+        {
+            // 第一步：在表头中找 BID 和 keyword 的字符位置
+            int? bidColIndex = null;
+            int? kwColIndex = null;
+            int headerRow = -1;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].Contains("BID"))
+                    bidColIndex = lines[i].IndexOf("BID");
+
+                if (lines[i].Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    kwColIndex = lines[i].IndexOf(keyword, StringComparison.OrdinalIgnoreCase);
+                    headerRow = i;
+                }
+
+                if (bidColIndex != null && kwColIndex != null) break;
+            }
+
+            if (kwColIndex == null)
+            {
+                trace.Add($"  ✗ 未找到关键字 \"{keyword}\"");
+                return ("解析失败", trace);
+            }
+
+            trace.Add($"  ✓ 表头: {lines[headerRow].TrimEnd()}");
+            trace.Add($"     BID 列起始: {bidColIndex}, 关键字 \"{keyword}\" 起始: {kwColIndex}");
+
+            // 第二步：遍历数据行，按 BID 过滤提取
+            bool hasBidFilter = !string.IsNullOrWhiteSpace(bidFilter);
+            for (int j = headerRow + 1; j < lines.Length; j++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[j])) continue;
+
+                string dataLine = lines[j];
+                trace.Add($"    数据行: {dataLine.TrimEnd()}");
+
+                // BID 过滤：如果有 BID 列位置且指定了过滤值
+                if (hasBidFilter && bidColIndex != null)
+                {
+                    if (bidColIndex.Value >= dataLine.Length) continue;
+                    string rowBid = dataLine.Substring(bidColIndex.Value).Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)[0];
+                    if (rowBid != bidFilter)
+                    {
+                        trace.Add($"       BID={rowBid}，不匹配过滤值 \"{bidFilter}\"，跳过");
+                        continue;
+                    }
+                    trace.Add($"       BID={rowBid}，匹配！");
+                }
+
+                if (kwColIndex.Value >= dataLine.Length)
+                {
+                    trace.Add($"    ✗ 数据行长度 ({dataLine.Length}) 不足");
+                    return ("解析失败", trace);
+                }
+
+                string rawValue = dataLine.Substring(kwColIndex.Value).Trim();
+                string[] parts = rawValue.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                trace.Add($"    从位置 {kwColIndex} 取子串: \"{rawValue}\"");
+                trace.Add($"    分割 ({parts.Length} 段): [{string.Join(" | ", parts)}]");
+
+                if (parts.Length >= 1)
+                {
+                    string value = parts[0].TrimEnd('.');
+                    trace.Add($"    → 列首字段: \"{value}\"");
+                    return (value, trace);
+                }
+                else
+                {
+                    trace.Add($"    ✗ 列下无数据");
+                    return ("解析失败", trace);
+                }
+            }
+            trace.Add("  ✗ 未找到匹配行");
             return ("解析失败", trace);
         }
 
@@ -547,9 +646,8 @@ namespace chengkong
             Thread.Sleep(200);  // 固定等待 200ms
 
             AppendLog(false, "[Telnet 登录] 发送: login:root");
-            shell.WriteLine("login:root");
+            shell.WriteLine("login:root,Changeme_123");
             Thread.Sleep(200);
-            shell.WriteLine("Changeme_123");
 
             // 轮询等待 [root@NE_name] # 提示符，最长 8 秒
             var sw = Stopwatch.StartNew();
@@ -566,7 +664,7 @@ namespace chengkong
                     catch { break; }
                 }
                 string accumulated = sb.ToString();
-                if (accumulated.Contains("[root@") && accumulated.Contains("]#"))
+                if (TelnetPromptRegex.IsMatch(accumulated))
                 {
                     AppendLog(false, $"[Telnet 登录] ✓ 成功（耗时 {sw.ElapsedMilliseconds} ms）");
                     // 读掉多余的提示符
@@ -589,24 +687,33 @@ namespace chengkong
             int intervalSec, int currentCount,
             Action<string> logFn, Action<string, bool?> resultFn,
             Action countFn,
-            ref int okCount, ref int notOkCount, ref int exceptionCount)
+            ref int okCount, ref int notOkCount, ref int exceptionCount,
+            string bidFilter = "")
         {
             var localLog = new List<string>(32);
             localLog.Add("");
             localLog.Add($"═══════ 第 {currentCount} 次执行 ═══════");
             localLog.Add($"[发送] 命令: {userCommand}");
-            localLog.Add($"[等待] 等 {intervalSec} 秒后读取返回...");
+            localLog.Add($"[间隔] {intervalSec} 秒后执行下一轮...");
             AppendLogBatch(isSerial, localLog);
             localLog.Clear();
 
             shell.WriteLine(userCommand);
 
-            int readMaxWaitMs = Math.Max(3000, intervalSec * 1000 * 2);
-
-            try { Task.Delay(intervalSec * 1000).Wait(); }
-            catch { }
-
+            // 读返回 + 补足间隔，保证整轮耗时 ≈ intervalSec
+            int readMaxWaitMs = (int)(intervalSec * 1000 * 0.8);
+            if (readMaxWaitMs < 800) readMaxWaitMs = 800;
+            var loopSw = Stopwatch.StartNew();
             string raw = ReadShellClean(shell, readMaxWaitMs);
+
+            // 补足剩余时间，使整轮控制在 intervalSec
+            int elapsed = (int)loopSw.ElapsedMilliseconds;
+            int remaining = intervalSec * 1000 - elapsed;
+            if (remaining > 0)
+            {
+                try { Task.Delay(remaining).Wait(); }
+                catch { }
+            }
 
             localLog.Add($"──── 原始返回 ({raw.Length} 字节) ────");
             if (string.IsNullOrWhiteSpace(raw))
@@ -617,7 +724,7 @@ namespace chengkong
             AppendLogBatch(isSerial, localLog);
             localLog.Clear();
 
-            var (parsed, trace) = ParseResult(raw, keyword, fieldPosition);
+            var (parsed, trace) = ParseResult(raw, keyword, fieldPosition, isSerial, bidFilter);
             localLog.Add($"──── 解析过程 ────");
             localLog.AddRange(trace);
             AppendLogBatch(isSerial, localLog);
@@ -696,74 +803,72 @@ namespace chengkong
             AppendLog(true, $"[参数] 命令: {command}");
             AppendLog(true, $"[参数] 关键字: \"{keyword}\"，位置: 第 {pos} 段");
 
-            // PreLoop
-            SerialPreLoop(_serialShell);
-
-            bool stoppedByFailure = false;
-            DateTime endTime = DateTime.Now.AddMinutes(totalMin);
-            int currentCount = _serialCount;
-            int exceptionCount = 0;
-
-            try
+            // 整个循环放到后台线程，避免 UI 阻塞
+            Task.Run(() =>
             {
-                while (DateTime.Now < endTime && !_serialCts.Token.IsCancellationRequested)
+                bool stoppedByFailure = false;
+                DateTime endTime = DateTime.Now.AddMinutes(totalMin);
+                int currentCount = _serialCount;
+                int exceptionCount = 0;
+
+                try
                 {
-                    var loopSw = Stopwatch.StartNew();
+                    // PreLoop
+                    SerialPreLoop(_serialShell);
 
-                    ExecuteOnce(isSerial: true, _serialShell,
-                        command, keyword, pos, interval, currentCount,
-                        txt => AppendLog(true, txt),
-                        (txt, isOk) => AppendResult(true, txt, isOk),
-                        () => UpdateCountDisplay(true),
-                        ref _serialOkCount, ref _serialNotOkCount, ref exceptionCount);
-
-                    loopSw.Stop();
-                    AppendLog(true, $"  本轮耗时: {loopSw.ElapsedMilliseconds}ms");
-
-                    if (exceptionCount >= TriggerStopCount)
+                    while (DateTime.Now < endTime && !_serialCts.Token.IsCancellationRequested)
                     {
-                        AppendLog(true, $"[终止] ✗ 连续 {TriggerStopCount} 次异常，自动终止！");
-                        AppendResult(true, $"连续 {TriggerStopCount} 次异常，任务终止！", false);
-                        Dispatcher.Invoke(() => MessageBox.Show($"连续 {TriggerStopCount} 次异常，已自动终止任务！", "任务终止", MessageBoxButton.OK, MessageBoxImage.Warning));
-                        stoppedByFailure = true;
-                        break;
+                        var loopSw = Stopwatch.StartNew();
+
+                        ExecuteOnce(isSerial: true, _serialShell,
+                            command, keyword, pos, interval, currentCount,
+                            txt => AppendLog(true, txt),
+                            (txt, isOk) => AppendResult(true, txt, isOk),
+                            () => UpdateCountDisplay(true),
+                            ref _serialOkCount, ref _serialNotOkCount, ref exceptionCount);
+
+                        loopSw.Stop();
+                        AppendLog(true, $"  本轮耗时: {loopSw.ElapsedMilliseconds}ms");
+
+                        if (exceptionCount >= TriggerStopCount)
+                        {
+                            AppendLog(true, $"[终止] ✗ 连续 {TriggerStopCount} 次异常，自动终止！");
+                            AppendResult(true, $"连续 {TriggerStopCount} 次异常，任务终止！", false);
+                            Dispatcher.Invoke(() => MessageBox.Show($"连续 {TriggerStopCount} 次异常，已自动终止任务！", "任务终止", MessageBoxButton.OK, MessageBoxImage.Warning));
+                            stoppedByFailure = true;
+                            break;
+                        }
+
+                        _serialCount++;
+                        currentCount = _serialCount;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendLog(true, $"[异常] {ex.GetType().Name}: {ex.Message}");
+                }
+                finally
+                {
+                    _serialRunning = false;
+
+                    // 串口：执行 PostLoop（redir_off）
+                    if (_serialShell != null && _serialClient != null && _serialClient.IsConnected)
+                    {
+                        try { SerialPostLoop(_serialShell); } catch { }
                     }
 
-                    _serialCount++;
-                    currentCount = _serialCount;
+                    // 关闭连接
+                    DisconnectSsh(isSerial: true);
+
+                    if (stoppedByFailure)
+                        AppendLog(true, "任务因连续异常终止");
+                    else
+                        AppendLog(true, "任务已完成");
+
+                    UpdateCountDisplay(isSerial: true);
+                    SetButtons(isSerial: true, isRunning: false, isConnected: false);
                 }
-            }
-            catch (Exception ex)
-            {
-                AppendLog(true, $"[异常] {ex.GetType().Name}: {ex.Message}");
-            }
-            finally
-            {
-                _serialRunning = false;
-
-                // 串口：执行 PostLoop（redir_off）
-                if (_serialShell != null && _serialClient != null && _serialClient.IsConnected)
-                {
-                    try { SerialPostLoop(_serialShell); } catch { }
-                }
-
-                // 关闭连接
-                DisconnectSsh(isSerial: true);
-
-                if (stoppedByFailure)
-                    AppendLog(true, "任务因连续异常终止");
-                else
-                    AppendLog(true, "任务已完成");
-
-                UpdateCountDisplay(isSerial: true);
-                SetButtons(isSerial: true, isRunning: false, isConnected: false);
-            }
-        }
-
-        private void SerialStop_Click(object sender, RoutedEventArgs e)
-        {
-            _serialCts?.Cancel();
-            AppendLog(true, "[用户] 点击停止，任务已取消");
+            });
         }
 
         // ══════════════════════════════════════════════════════════
@@ -799,6 +904,7 @@ namespace chengkong
             if (!int.TryParse(TelnetTotalTime.Text, out int totalMin) || totalMin < 1) totalMin = 2;
             string command = TelnetSshCommand.Text.Trim();
             string keyword = TelnetKeyword.Text.Trim();
+            string bidFilter = ((ComboBoxItem)TelnetBidFilter.SelectedItem).Content?.ToString() ?? "";
             int pos = TelnetFieldPosition.SelectedIndex + 1;
 
             if (string.IsNullOrEmpty(command)) { MessageBox.Show("请输入命令", "提示", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
@@ -821,77 +927,73 @@ namespace chengkong
             AppendLog(false, $"[参数] 命令: {command}");
             AppendLog(false, $"[参数] 关键字: \"{keyword}\"，位置: 第 {pos} 段");
 
-            // Telnet 登录
-            bool loginOk = TelnetLogin(_telnetShell);
-            if (!loginOk)
+            // 整个循环放到后台线程，避免 UI 阻塞
+            Task.Run(() =>
             {
-                AppendLog(false, "[Telnet 登录] ✗ 失败，任务终止");
-                Dispatcher.Invoke(() => MessageBox.Show("Telnet 登录失败（8s 未检测到提示符），请检查设备是否正常", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
-                _telnetRunning = false;
-                DisconnectSsh(isSerial: false);
-                SetButtons(isSerial: false, isRunning: false, isConnected: false);
-                return;
-            }
+                bool stoppedByFailure = false;
+                DateTime endTime = DateTime.Now.AddMinutes(totalMin);
+                int currentCount = _telnetCount;
+                int exceptionCount = 0;
 
-            bool stoppedByFailure = false;
-            DateTime endTime = DateTime.Now.AddMinutes(totalMin);
-            int currentCount = _telnetCount;
-            int exceptionCount = 0;
-
-            try
-            {
-                while (DateTime.Now < endTime && !_telnetCts.Token.IsCancellationRequested)
+                try
                 {
-                    var loopSw = Stopwatch.StartNew();
-
-                    ExecuteOnce(isSerial: false, _telnetShell,
-                        command, keyword, pos, interval, currentCount,
-                        txt => AppendLog(false, txt),
-                        (txt, isOk) => AppendResult(false, txt, isOk),
-                        () => UpdateCountDisplay(false),
-                        ref _telnetOkCount, ref _telnetNotOkCount, ref exceptionCount);
-
-                    loopSw.Stop();
-                    AppendLog(false, $"  本轮耗时: {loopSw.ElapsedMilliseconds}ms");
-
-                    if (exceptionCount >= TriggerStopCount)
+                    // Telnet 登录
+                    bool loginOk = TelnetLogin(_telnetShell);
+                    if (!loginOk)
                     {
-                        AppendLog(false, $"[终止] ✗ 连续 {TriggerStopCount} 次异常，自动终止！");
-                        AppendResult(false, $"连续 {TriggerStopCount} 次异常，任务终止！", false);
-                        Dispatcher.Invoke(() => MessageBox.Show($"连续 {TriggerStopCount} 次异常，已自动终止任务！", "任务终止", MessageBoxButton.OK, MessageBoxImage.Warning));
-                        stoppedByFailure = true;
-                        break;
+                        AppendLog(false, "[Telnet 登录] ✗ 失败，任务终止");
+                        Dispatcher.Invoke(() => MessageBox.Show("Telnet 登录失败（8s 未检测到提示符），请检查设备是否正常", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
+                        return;
                     }
 
-                    _telnetCount++;
-                    currentCount = _telnetCount;
+                    while (DateTime.Now < endTime && !_telnetCts.Token.IsCancellationRequested)
+                    {
+                        var loopSw = Stopwatch.StartNew();
+
+                        ExecuteOnce(isSerial: false, _telnetShell,
+                            command, keyword, pos, interval, currentCount,
+                            txt => AppendLog(false, txt),
+                            (txt, isOk) => AppendResult(false, txt, isOk),
+                            () => UpdateCountDisplay(false),
+                            ref _telnetOkCount, ref _telnetNotOkCount, ref exceptionCount,
+                            bidFilter);
+
+                        loopSw.Stop();
+                        AppendLog(false, $"  本轮耗时: {loopSw.ElapsedMilliseconds}ms");
+
+                        if (exceptionCount >= TriggerStopCount)
+                        {
+                            AppendLog(false, $"[终止] ✗ 连续 {TriggerStopCount} 次异常，自动终止！");
+                            AppendResult(false, $"连续 {TriggerStopCount} 次异常，任务终止！", false);
+                            Dispatcher.Invoke(() => MessageBox.Show($"连续 {TriggerStopCount} 次异常，已自动终止任务！", "任务终止", MessageBoxButton.OK, MessageBoxImage.Warning));
+                            stoppedByFailure = true;
+                            break;
+                        }
+
+                        _telnetCount++;
+                        currentCount = _telnetCount;
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                AppendLog(false, $"[异常] {ex.GetType().Name}: {ex.Message}");
-            }
-            finally
-            {
-                _telnetRunning = false;
+                catch (Exception ex)
+                {
+                    AppendLog(false, $"[异常] {ex.GetType().Name}: {ex.Message}");
+                }
+                finally
+                {
+                    _telnetRunning = false;
 
-                // Telnet：直接关闭 SSH（不发送 exit）
-                DisconnectSsh(isSerial: false);
+                    // Telnet：直接关闭 SSH（不发送 exit）
+                    DisconnectSsh(isSerial: false);
 
-                if (stoppedByFailure)
-                    AppendLog(false, "任务因连续异常终止");
-                else
-                    AppendLog(false, "任务已完成");
+                    if (stoppedByFailure)
+                        AppendLog(false, "任务因连续异常终止");
+                    else
+                        AppendLog(false, "任务已完成");
 
-                UpdateCountDisplay(isSerial: false);
-                SetButtons(isSerial: false, isRunning: false, isConnected: false);
-            }
-        }
-
-        private void TelnetStop_Click(object sender, RoutedEventArgs e)
-        {
-            _telnetCts?.Cancel();
-            AppendLog(false, "[用户] 点击停止，任务已取消");
+                    UpdateCountDisplay(isSerial: false);
+                    SetButtons(isSerial: false, isRunning: false, isConnected: false);
+                }
+            });
         }
 
         // ══════════════════════════════════════════════════════════
