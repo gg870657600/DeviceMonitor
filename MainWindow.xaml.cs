@@ -266,6 +266,13 @@ namespace chengkong
                     {
                         var connInfo = new ConnectionInfo(ip, port, user,
                             new PasswordAuthenticationMethod(user, pwd));
+                        // 兼容老设备（OpenSSH 6.7 等仅支持 ssh-rsa host key）
+                        // SSH.NET 2025.1.0 默认 HostKeyAlgorithms 不含 ssh-rsa，协商无匹配会导致 Connect 死等
+                        connInfo.HostKeyAlgorithms.Clear();
+                        connInfo.HostKeyAlgorithms.Add("ssh-rsa",
+                            data => new Renci.SshNet.Security.KeyHostAlgorithm("ssh-rsa",
+                                new Renci.SshNet.Security.RsaKey(
+                                    new Renci.SshNet.Security.SshKeyData(data))));
                         c = new SshClient(connInfo);
                         c.Connect();
 
