@@ -218,10 +218,10 @@
                             <TextBlock Text="运行参数" Style="{StaticResource GroupTitle}"/>
                             <WrapPanel>
                                 <TextBlock Text="间隔时间" Style="{StaticResource LabelText}"/>
-                                <TextBox Name="SerialIntervalTime" Text="60" Width="50" Style="{StaticResource ModernTextBox}"/>
+                                <TextBox Name="SerialIntervalTime" Text="1" Width="50" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="秒" Style="{StaticResource LabelText}" Margin="0,0,20,0"/>
                                 <TextBlock Text="总测试时间" Style="{StaticResource LabelText}"/>
-                                <TextBox Name="SerialTotalTime" Text="2" Width="50" Style="{StaticResource ModernTextBox}"/>
+                                <TextBox Name="SerialTotalTime" Text="1" Width="50" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="分钟" Style="{StaticResource LabelText}"/>
                             </WrapPanel>
                         </StackPanel>
@@ -382,10 +382,10 @@
                             <TextBlock Text="运行参数" Style="{StaticResource GroupTitle}"/>
                             <WrapPanel>
                                 <TextBlock Text="间隔时间" Style="{StaticResource LabelText}"/>
-                                <TextBox Name="TelnetIntervalTime" Text="60" Width="50" Style="{StaticResource ModernTextBox}"/>
+                                <TextBox Name="TelnetIntervalTime" Text="1" Width="50" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="秒" Style="{StaticResource LabelText}" Margin="0,0,20,0"/>
                                 <TextBlock Text="总测试时间" Style="{StaticResource LabelText}"/>
-                                <TextBox Name="TelnetTotalTime" Text="2" Width="50" Style="{StaticResource ModernTextBox}"/>
+                                <TextBox Name="TelnetTotalTime" Text="1" Width="50" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="分钟" Style="{StaticResource LabelText}"/>
                             </WrapPanel>
                         </StackPanel>
@@ -402,7 +402,7 @@
                                            ToolTip="匹配返回结果的表头列名（不区分大小写），自动取该列下数据。&#x0a;示例：表头 &quot;BID PID CHID ESN0 EBN0&quot;，关键字填 &quot;EBN0&quot; 提取该列数值。"/>
                                 <TextBox Name="TelnetKeyword" Text="EBN0" Width="100" Style="{StaticResource ModernTextBox}"/>
                                 <TextBlock Text="BID过滤" Style="{StaticResource LabelText}" Margin="20,0,6,0"
-                                           ToolTip="当返回结果包含多行数据时，筛选指定 BID 的行。&#x0a;示例：BID=3 的行提取 disable，BID=4 的行提取 enable。"/>
+                                           ToolTip="当返回结果包含多行数据时，筛选指定 BID 的行。&#x0a;示例：get-if-aupc 返回多 BID 数据，填写 3 则只提取 BID=3 的行：&#x0a;  BID  PID  CHID  AUPC&#x0a;  3    1    1     disable&#x0a;  4    1    1     enable"/>
                                 <ComboBox Name="TelnetBidFilter" SelectedIndex="0" Width="70" Style="{StaticResource FieldPositionCombo}">
                                      <ComboBoxItem IsSelected="True">3</ComboBoxItem>
                                      <ComboBoxItem>4</ComboBoxItem>

@@ -9,17 +9,45 @@
         FontSize="13">
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- 导出按钮栏（独立行，固定在图表上方，绝对不会被覆盖） -->
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="" VerticalAlignment="Center"/>
+
+            <Button Name="ExportExcelBtn"
+                    Grid.Column="1"
+                    Content="导出 Excel"
+                    Width="100"
+                    Height="32"
+                    Margin="0,4,0,4"
+                    Background="#FF0078D4"
+                    Foreground="White"
+                    BorderBrush="#FF005A9E"
+                    BorderThickness="1"
+                    FontSize="13"
+                    FontWeight="Bold"
+                    Cursor="Hand"
+                    ToolTip="导出当前图表数据到 Excel 工作簿，并自动生成折线图"
+                    Click="ExportExcel_Click"/>
+        </Grid>
+
         <!-- 图表 -->
         <lvc:CartesianChart Name="ChartControl"
+                            Grid.Row="1"
                             ZoomMode="Both"
                             TooltipPosition="Top"/>
 
         <!-- 底部统计面板 -->
-        <Border Grid.Row="1" Margin="0,10,0,0" Padding="12,10"
+        <Border Grid.Row="2" Margin="0,10,0,0" Padding="12,10"
                 Background="White" BorderBrush="#FFE8E8E8"
                 BorderThickness="1" CornerRadius="6">
             <Grid>
