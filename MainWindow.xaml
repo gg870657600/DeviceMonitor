@@ -195,7 +195,7 @@
                     <!-- SSH 连接 -->
                     <Border Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource GroupPanel}">
                         <StackPanel>
-                            <TextBlock Text="SSH 连接" Style="{StaticResource GroupTitle}"/>
+                            <TextBlock Text="SSH 连接（登录后执行 bsp redir_on）" Style="{StaticResource GroupTitle}"/>
                             <WrapPanel>
                                 <TextBlock Text="IP" Style="{StaticResource LabelText}"/>
                                 <TextBox Name="SerialIp" Text="197.6.7.23" Width="140" Style="{StaticResource ModernTextBox}"/>

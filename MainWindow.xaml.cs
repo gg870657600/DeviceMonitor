@@ -595,11 +595,18 @@ namespace DeviceMonitor
         // ══════════════════════════════════════════════════════════
         // 公共：写文件日志
         // ══════════════════════════════════════════════════════════
+        // 日志固定写到 exe 自身所在目录（单文件自包含下 AppDomain.BaseDirectory 会指向临时解压目录，不能用）
+        private static string GetLogDir()
+        {
+            string? exeDir = Path.GetDirectoryName(Environment.ProcessPath);
+            return string.IsNullOrEmpty(exeDir) ? AppDomain.CurrentDomain.BaseDirectory : exeDir;
+        }
+
         private void WriteLogToFile(string fileName, int count, string raw, string parsed, string keyword, int pos)
         {
             try
             {
-                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+                string path = Path.Combine(GetLogDir(), fileName);
                 string content = $"==================================================\r\n" +
                                  $"日志时间：{DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +
                                  $"执行次数：第 {count} 次\r\n" +
@@ -860,7 +867,7 @@ namespace DeviceMonitor
             ClearResult(isSerial: true);
             _serialChartData.Clear();
 
-            File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SensorPosLog.txt"), "");
+            File.WriteAllText(Path.Combine(GetLogDir(), "SensorPosLog.txt"), "");
 
             _serialRunning = true;
             _serialCts = new CancellationTokenSource();
@@ -985,7 +992,7 @@ namespace DeviceMonitor
             ClearResult(isSerial: false);
             _telnetChartData.Clear();
 
-            File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TelnetLog.txt"), "");
+            File.WriteAllText(Path.Combine(GetLogDir(), "TelnetLog.txt"), "");
 
             _telnetRunning = true;
             _telnetCts = new CancellationTokenSource();
